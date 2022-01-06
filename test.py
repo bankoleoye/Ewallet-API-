@@ -1,7 +1,7 @@
 import unittest
 
 
-class Test(unittest.Tesctcase):
+class Test(unittest.Testcase):
     pass
 
 
