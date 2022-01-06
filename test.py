@@ -1,10 +1,8 @@
 import unittest
+from django.test import TestCase
 
 
-class Test(unittest.Tesctcase):
-    pass
-
-
-if __name__ == '__main__':
-    unittest.main()
+class Test(unittest.TestCase):
+    def testlogin(self):
+        pass
     
