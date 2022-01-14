@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',    
     'accounts.apps.AccountsConfig',
     'wallets',
+    'rest_framework.authtoken',
     # 'admin',
 
     # 3rd party 
