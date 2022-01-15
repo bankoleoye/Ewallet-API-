@@ -1,10 +1,11 @@
+from django.contrib import auth
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import authentication, permissions
 from .models import User, Wallet
 from rest_framework import status
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 
 
@@ -23,9 +24,10 @@ class IsOnlyElite(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method == 'PUT' or request.method in permissions.SAFE_METHODS:
             return True
-        return not obj.type == 'Noob' or obj.type == 'Admin'
+        return obj.type == 'Elite'
 
 class Register(APIView):
+    permission_classes=[permissions.AllowAny]
     serializer_class = RegisterSerializer
     wallet_serializer_class = WalletSerializer
 
@@ -33,28 +35,28 @@ class Register(APIView):
         user_data = {
             'email': request.data.get('email'),
             'username': request.data.get('username'),
-            'password': request.data.get('password')
+            'password': request.data.get('password'),
+            "type": request.data.get('type'),
         }
         user_serializer = self.serializer_class(data=user_data)
-        if not user_serializer.is_valid():
-            return Response({ 'error': 'Registration failed' }, status=status.HTTP_400_BAD_REQUEST)
+        user_serializer.is_valid(raise_exception=True)
         user_serializer.save()
-        user = user_serializer.data
+        user = User.objects.get(email=user_data.get('email'))
         if not user.type == 'Admin':
             wallet_data = {
                 'currency': request.data.get('currency').upper(),
-                'value': request.data.get('value'),
+                'balance': request.data.get('balance'),
                 'user_id': user.id,
             }
             wallet_serializer = self.wallet_serializer_class(data=wallet_data)
             if not wallet_serializer.is_valid():
                 return Response({ 'error': 'Wallet creation failed' }, status=status.HTTP_400_BAD_REQUEST)
+            wallet_serializer.save()
             data = {
-                'user': user,
                 'wallet': wallet_serializer.data
             }
             return Response(data)
-        return Response(user)
+        return Response(user_serializer.data)
 
 class PromoteDemoteUser(APIView):
     permission_classes=[IsAdminOnlyOrPost]
@@ -80,28 +82,42 @@ class Login(APIView):
     def post(self, request, format=None):
         user = authenticate(email=request.data.get("email"), password=request.data.get("password"))
         if user:
-            login(request, user)
-            token = Token.objects.get_or_create(user=user)
+            try:
+                token = Token.objects.get(user=user)
+            except:
+                token = Token.objects.create(user=user)
             serializer = UserSerializer(user)
             return Response({"user": serializer.data, "token": token.key})
         return Response({ "error": "User does not exist" }, status=status.HTTP_404_NOT_FOUND)
 
 class WalletListView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsOnlyElite]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOnlyElite]
     serializer_class = WalletSerializer
+
+    def get(self, request):
+        wallets = Wallet.objects.all()
+        serializer = self.serializer_class(wallets, many=True)
+
+        return Response(serializer.data)
 
     def post(self, request):
         auth_email = request.user
         user = User.objects.get(email=auth_email)
 
-        if not self.check_object_permissions(request, user):
+        if self.check_object_permissions(request, user):
             return Response({ "error": "User cannot have multiple wallets" }, status=status.HTTP_403_FORBIDDEN)
-        wallet = Wallet.objects.get(user_id=user.id, currency=request.data.get("currency"))
-        if wallet:
+        try:
+            wallet = Wallet.objects.get(user_id=user.id, currency=request.data.get("currency"))
             return Response({ "error": "Wallet already exist" }, status=status.HTTP_400_BAD_REQUEST)
-        serializer = self.serializer_class(data=request.data)
-        if not serializer.is_valid():
-            return Response({ 'error': 'Wallet creation failed' }, status=status.HTTP_400_BAD_REQUEST)
+        except:
+            pass
+        request_data = {
+            "currency": request.data.get('currency'),
+            "balance": request.data.get('balance'),
+            "user_id": user.id
+        }
+        serializer = self.serializer_class(data=request_data)
+        serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
@@ -113,7 +129,7 @@ class TransactionView(APIView):
         user = User.objects.get(email=auth_email)
         wallet = Wallet.objects.get(id=pk)
         result = 0
-        amount = request.data.get('amount')
+        amount = request.data.get('balance')
         if not user.type == 'Admin':
             wallet = Wallet.objects.get(id=pk, user_id=user.id)
         if not wallet:
@@ -127,8 +143,7 @@ class TransactionView(APIView):
         if request.data.get('action') == 'fund':
             result = wallet.balance + amount
         serializer = self.serializer_class(wallet, { 'balance': result  }, partial=True)
-        if not serializer.is_valid():
-            return Response({ 'error': 'Transaction failed' }, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
