@@ -9,13 +9,13 @@ from .utils import Util
 # Create your models here.
 class UserManager(BaseUserManager):
 
-    def create_user(self, username, email, password=None):
+    def create_user(self, username, type, email, password=None):
         if username is None:
             raise TypeError('User should enter a username')
         if email is None:
             raise TypeError('User should enter an Email')
 
-        user=self.model(username=username, email=self.normalize_email(email))
+        user=self.model(username=username, type=type, email=self.normalize_email(email))
         user.set_password(password)
         user.save()
         return user
