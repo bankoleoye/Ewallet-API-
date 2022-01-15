@@ -36,7 +36,7 @@ class User(AbstractBaseUser,PermissionsMixin):
         ('Elite', 'Elite'),
         ('Admin', 'Admin'),
     ]
-    types = models.CharField(max_length=15, default="Noob", choices=user_types)
+    type = models.CharField(max_length=15, default="Noob", choices=user_types)
     username=models.CharField(max_length=200, unique=True, db_index=True)
     email=models.EmailField(max_length=100, unique=True, db_index=True)
     is_verified=models.BooleanField(default=False)
@@ -54,7 +54,7 @@ class User(AbstractBaseUser,PermissionsMixin):
         return self.email
 
 
-class Ewallet(models.Model):
+class Wallet(models.Model):
     currency_types = [
         ('USD', 'USD'),
         ('GBP', 'GBP'),
