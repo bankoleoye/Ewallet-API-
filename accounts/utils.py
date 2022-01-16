@@ -4,6 +4,7 @@ import string
 
 
 class Util:
+
     @staticmethod
     def send_email(data):
         email = EmailMessage(
@@ -16,7 +17,7 @@ class Util:
     @staticmethod
     def generate_otp(num):
         return ''.join(random.choice(string.digits) for i in range(num))
-        
+
     @staticmethod
     def create_account_number(num):
         return '419' + ''.join(random.choice(string.digits) for i in range(num))
